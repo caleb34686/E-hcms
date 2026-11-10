@@ -1,0 +1,105 @@
+// /frontend/prisma/schema.prisma
+// e-HCMS Full-Stack Next.js Data Architecture
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  fullName  String
+  role      String   // 'HONORARY_CONSUL' | 'HEAD_OF_MISSION' | 'HQ_ADMIN' | 'PROTOCOL_OFFICER' | 'PCS'
+  createdAt DateTime @default(now())
+  
+  // Relations
+  consulProfile        HonoraryConsulProfile?
+  executedRenewals     RenewalWorkflowLog[]
+}
+
+model HonoraryConsulProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  fullName          String
+  dateOfAppointment DateTime
+  contractEndDate   DateTime
+  citiesOfOperation String   // Comma-separated or serialized format
+  jurisdictions     String   // Comma-separated string format
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workLogs          WorkLogEntry[]
+  quarterlyReports  QuarterlyReport[]
+  expirationAlerts  ContractAlert[]
+  renewalHistory    RenewalWorkflowLog[]
+}
+
+model WorkLogEntry {
+  id             String   @id @default(uuid())
+  consulId       String
+  title          String
+  activityNotes  String   // Rich-text payload data
+  assignedDuties String
+  completedTasks String
+  entryDate      DateTime @default(now())
+  timestamp      DateTime @default(now())
+  isLocked       Boolean  @default(false) // FR-03 Tamper protection rule
+
+  // Relations
+  consul         HonoraryConsulProfile @relation(fields: [consulId], references: [id], onDelete: Cascade)
+}
+
+model QuarterlyReport {
+  id                  String   @id @default(uuid())
+  consulId            String
+  quarter             Int      // 1 | 2 | 3 | 4
+  year                Int
+  submissionTimestamp DateTime?
+  receiptToken        String?  @unique
+  status              String   // 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED'
+  
+  // Reporting Form Data
+  achievements        String
+  challenges          String
+  diplomaticEngagements String
+  
+  // Ambassador Assessments
+  evaluationSummary   String?
+  recommendationToHQ  String?  // 'RENEW' | 'TERMINATE' | 'DEFER'
+
+  // Relations
+  consul              HonoraryConsulProfile @relation(fields: [consulId], references: [id], onDelete: Cascade)
+}
+
+model ContractAlert {
+  id             String   @id @default(uuid())
+  consulId       String
+  daysRemaining  Int
+  thresholdStage Int      // 90 | 60 | 30
+  dispatchedAt   DateTime @default(now())
+  isResolved     Boolean  @default(false)
+
+  // Relations
+  consul         HonoraryConsulProfile @relation(fields: [consulId], references: [id], onDelete: Cascade)
+}
+
+model RenewalWorkflowLog {
+  id                      String   @id @default(uuid())
+  consulId                String
+  previousContractEndDate DateTime
+  newContractEndDate      DateTime
+  approvedByUserId        String
+  authorizationNotes      String
+  timestamp               DateTime @default(now())
+
+  // Relations
+  consul                  HonoraryConsulProfile @relation(fields: [consulId], references: [id], onDelete: Cascade)
+  approvedBy              User                  @relation(fields: [approvedByUserId], references: [id])
+}
